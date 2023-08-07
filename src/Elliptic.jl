@@ -14,22 +14,37 @@ using .Jacobi
 
 include("slatec.jl")
 
-function E(phi, m)
-    T = promote_type(typeof(phi), typeof(m))
+function E(phi::Float64, m::Float64)
     if isnan(phi) || isnan(m) return NaN end
-    if m < zero(T)  || m > one(T) throw(DomainError(m, "argument m not in [0,1]")) end
+    if m > 1. # https://dlmf.nist.gov/19.7
+        k1 = sqrt(m)
+        k2 = inv(m)
+        k = inv(k1)
+        β = asin(k1*sin(phi))
+        return (E(β, k2)-(1-k2)*F(β, k2))/k
+    elseif m < 0.
+        k2 = -m
+        k = √k2
+        κp2 = inv((1+k2))
+        κp = sqrt(κp2) 
+        κ2 = k2/(1+k2)
+        sinθ = (√(1+k2)*sin(phi))/(√(1+k2*sin(phi)^2))
+        cosθ = √(1-sinθ^2)
+        θ = asin(sinθ)
+        return (E(θ, κ2) - κ2*(sinθ*cosθ)/sqrt(1-κ2*sinθ^2))/κp
+    end
     if abs(phi) > pi/2
         phi2 = phi + pi/2
         return 2*fld(phi2,pi)*E(m) - _E(cos(mod(phi2,pi)), m)
     end
     _E(sin(phi), m)
 end
-function _E(sinphi, m)
+function _E(sinphi::Float64, m::Float64)
     sinphi2 = sinphi^2
-    cosphi2 = 1 - sinphi2
-    y = 1 - m*sinphi2
-    drf,ierr1 = SLATEC.DRF(cosphi2, y, 1)
-    drd,ierr2 = SLATEC.DRD(cosphi2, y, 1)
+    cosphi2 = 1. - sinphi2
+    y = 1. - m*sinphi2
+    drf,ierr1 = SLATEC.DRF(cosphi2, y, 1.)
+    drd,ierr2 = SLATEC.DRD(cosphi2, y, 1.)
     if ierr1 == ierr2 == 0
         return sinphi*(drf - m*sinphi2*drd/3)
     elseif ierr1 == ierr2 == 2
@@ -38,6 +53,8 @@ function _E(sinphi, m)
     end
     NaN
 end
+E(phi::Real, m::Real) = E(Float64(phi), Float64(m))
+
 #E(phi::Real, m::Real) = E(Float64(phi), Float64(m))
 
 
